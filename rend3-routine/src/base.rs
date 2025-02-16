@@ -105,12 +105,12 @@ pub struct BaseRenderGraph {
 }
 
 impl BaseRenderGraph {
-    pub fn new(renderer: &Arc<Renderer>, spp: &ShaderPreProcessor) -> Self {
+    pub fn new(renderer: &Arc<Renderer>, spp: &ShaderPreProcessor, anisotropy_clamp: u16) -> Self {
         profiling::scope!("DefaultRenderGraphData::new");
 
         let interfaces = common::WholeFrameInterfaces::new(&renderer.device);
 
-        let samplers = common::Samplers::new(&renderer.device);
+        let samplers = common::Samplers::new(&renderer.device, anisotropy_clamp);
 
         // TODO: Support more materials
 

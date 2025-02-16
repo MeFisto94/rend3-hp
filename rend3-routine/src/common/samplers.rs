@@ -16,12 +16,12 @@ pub struct Samplers {
 
 impl Samplers {
     /// Create a new set of samplers with this device.
-    pub fn new(device: &Device) -> Self {
+    pub fn new(device: &Device, anisotropy_clamp: u16) -> Self {
         profiling::scope!("Samplers::new");
 
-        let linear = create_sampler(device, FilterMode::Linear, None);
-        let nearest = create_sampler(device, FilterMode::Nearest, None);
-        let shadow = create_sampler(device, FilterMode::Linear, Some(CompareFunction::GreaterEqual));
+        let linear = create_sampler(device, FilterMode::Linear, None, Some("linear 16x aniso"), anisotropy_clamp);
+        let nearest = create_sampler(device, FilterMode::Nearest, None, Some("nearest"), 1);
+        let shadow = create_sampler(device, FilterMode::Linear, Some(CompareFunction::GreaterEqual), Some("Shadow"), 1);
 
         Self { linear, nearest, shadow }
     }
@@ -39,9 +39,15 @@ impl Samplers {
     }
 }
 
-fn create_sampler(device: &Device, filter: FilterMode, compare: Option<CompareFunction>) -> Sampler {
+fn create_sampler(
+    device: &Device,
+    filter: FilterMode,
+    compare: Option<CompareFunction>,
+    label: Option<&'static str>,
+    anisotropy_clamp: u16,
+) -> Sampler {
     device.create_sampler(&SamplerDescriptor {
-        label: Some("linear"),
+        label,
         address_mode_u: AddressMode::Repeat,
         address_mode_v: AddressMode::Repeat,
         address_mode_w: AddressMode::Repeat,
@@ -51,7 +57,7 @@ fn create_sampler(device: &Device, filter: FilterMode, compare: Option<CompareFu
         lod_min_clamp: 0.0,
         lod_max_clamp: 100.0,
         compare,
-        anisotropy_clamp: 1,
+        anisotropy_clamp,
         border_color: None,
     })
 }

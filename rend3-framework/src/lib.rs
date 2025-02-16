@@ -117,7 +117,7 @@ pub trait App<T: 'static = ()> {
     }
 
     fn create_base_rendergraph(&mut self, renderer: &Arc<Renderer>, spp: &mut ShaderPreProcessor) -> BaseRenderGraph {
-        BaseRenderGraph::new(renderer, spp)
+        BaseRenderGraph::new(renderer, spp, 1)
     }
 
     /// Determines the sample count used, this may change dynamically. This
