@@ -302,6 +302,7 @@ fn set_object_transform<M: Material>(
     object.inner.bounding_sphere = object.mesh_bounding_sphere.apply_transform(transform);
     object.location = transform.transform_point3a(Vec3A::ZERO);
 
+    buffer.drop_index(idx);
     buffer.use_index(idx);
 }
 
@@ -326,6 +327,7 @@ fn remove<M: Material>(archetype: &mut ObjectArchetype, idx: usize) {
 
     if removed_obj.is_some() {
         archetype.object_count -= 1;
+        archetype.buffer.drop_index(idx);
     }
 }
 

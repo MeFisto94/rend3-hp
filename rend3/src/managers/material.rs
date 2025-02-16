@@ -201,6 +201,7 @@ impl MaterialManager {
 
         let archetype = self.archetypes.get_mut(&type_id).unwrap();
         let bind_group_index = (archetype.remove_data)(&mut archetype.data_vec, handle);
+        archetype.buffer.drop_index(handle.idx);
 
         if let ProfileData::Cpu(index) = bind_group_index {
             self.texture_deduplicator.remove(index);

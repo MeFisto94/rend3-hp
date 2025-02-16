@@ -46,11 +46,18 @@ impl FreelistDerivedBuffer {
     }
 
     pub fn use_index(&mut self, index: usize) {
-        if index > self.reserved_count {
-            self.reserved_count = index.next_power_of_two();
+        if index >= self.reserved_count {
+            self.reserved_count = (index + 1).next_power_of_two();
         }
 
         self.stale.push(index);
+    }
+
+    /// Drops an index from the stale buffer, the list marked for updating this frame.
+    /// This is required when use_index was called in the same frame as something was dropped, to prevent updating
+    /// an already removed element.
+    pub fn drop_index(&mut self, index: usize) {
+        self.stale.retain(|&x| x != index);
     }
 
     pub fn apply<T, F>(
