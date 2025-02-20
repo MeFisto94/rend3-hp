@@ -246,7 +246,9 @@ impl<'a> ShaderVertexBufferHelper<'a> {
                     true => Some((idx, s)),
                     false => None,
                 })
-                .unwrap();
+                .unwrap_or_else(|| {
+                    panic!("Requested attribute {:?} not found in vertex buffer config", requested_attribute)
+                });
 
             writeln!(input_struct, "    {}: {},", spec.attribute.name(), spec.attribute.metadata().shader_type)?;
 
