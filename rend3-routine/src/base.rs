@@ -302,7 +302,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
                     },
                     samples: SampleCount::One,
                     renderpass: renderpass.clone(),
-                });
+                }, |_| (), |_, _, _| ());
             }
         }
     }
@@ -334,7 +334,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
                 },
                 samples: self.inputs.target.samples,
                 renderpass: self.primary_renderpass.clone(),
-            });
+            }, |_| (), |_, _, _| ());
         }
     }
 
@@ -351,7 +351,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
             },
             samples: self.inputs.target.samples,
             renderpass: self.primary_renderpass.clone(),
-        });
+        }, |_| (), |_, _, _| ());
     }
 
     /// Tonemap onto the given render target.

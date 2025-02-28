@@ -7,6 +7,7 @@ use std::{cmp::Ordering, marker::PhantomData, sync::Arc};
 use arrayvec::ArrayVec;
 use encase::{ShaderSize, StorageBuffer};
 use ordered_float::OrderedFloat;
+use rend3::graph::{NodeExecutionContext, RenderGraphNodeBuilder};
 use rend3::{
     graph::{DataHandle, NodeResourceUsage, RenderGraph, RenderPassTargets},
     managers::{CameraState, InternalObject, MaterialArchetypeView, TextureBindGroupIndex},
@@ -18,8 +19,8 @@ use serde::Serialize;
 use wgpu::{
     BindGroup, BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
     FragmentState, IndexFormat, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PolygonMode,
-    PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule, StencilState,
-    TextureFormat, VertexState,
+    PrimitiveState, PrimitiveTopology, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
+    StencilState, TextureFormat, VertexState,
 };
 
 use crate::common::{CameraSpecifier, PerMaterialArchetypeInterface, WholeFrameInterfaces};
@@ -33,7 +34,7 @@ struct ForwardPreprocessingArguments {
     vertex_array_counts: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum RoutineType {
     Depth,
     Forward,
@@ -146,13 +147,22 @@ impl<M: Material> ForwardRoutine<M> {
     }
 
     /// Add the given routine to the graph with the given settings.
-    pub fn add_forward_to_graph<'node>(&'node self, args: ForwardRoutineArgs<'_, 'node, M>) {
+    pub fn add_forward_to_graph<'node, F, G, T>(
+        &'node self,
+        args: ForwardRoutineArgs<'_, 'node, M>,
+        build_graph: F,
+        build_encoder: G,
+    ) where
+        F: FnOnce(&mut RenderGraphNodeBuilder) -> T,
+        G: FnOnce(&mut NodeExecutionContext, &mut RenderPass, T) + 'node,
+        T: 'node,
+    {
         let mut builder = args.graph.add_node(args.label);
-
         let rpass_handle = builder.add_renderpass(args.renderpass.clone(), NodeResourceUsage::InputOutput);
-
         let whole_frame_uniform_handle =
             builder.add_data(args.binding_data.whole_frame_uniform_bg, NodeResourceUsage::Input);
+
+        let t: T = build_graph(&mut builder);
 
         builder.build(move |mut ctx| {
             let rpass = ctx.encoder_or_pass.take_rpass(rpass_handle);
@@ -215,6 +225,8 @@ impl<M: Material> ForwardRoutine<M> {
             if let ProfileData::Gpu(ref bg) = ctx.eval_output.d2_texture.bg {
                 rpass.set_bind_group(2, Some(&**bg), &[]);
             }
+
+            build_encoder(&mut ctx, &mut rpass, t);
 
             profiling::scope!("Binding/drawing");
             for (idx, object) in objects.into_iter() {
