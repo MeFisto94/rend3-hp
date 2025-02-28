@@ -364,7 +364,11 @@ fn build_forward_pipeline_inner<M: Material>(
             blend: None,
             write_mask: ColorWrites::all(),
         }));
+    } else if !matches!(samples, SampleCount::One) {
+        // TODO: empower the descriptor_callback
+        render_targets.push(None); // temporary hack to at least allow the descriptor to catch it.
     }
+
     let mut desc = RenderPipelineDescriptor {
         label: Some(args.name),
         layout: Some(pll),
