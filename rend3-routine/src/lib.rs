@@ -21,6 +21,7 @@
 pub mod base;
 pub mod clear;
 pub mod common;
+pub mod compute;
 pub mod forward;
 pub mod pbr;
 mod shaders;

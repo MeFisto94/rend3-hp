@@ -37,7 +37,7 @@ impl WholeFrameInterfaces {
         Samplers::add_to_bgl(&mut uniform_bglb);
 
         uniform_bglb.append(
-            ShaderStages::VERTEX_FRAGMENT,
+            ShaderStages::VERTEX_FRAGMENT | ShaderStages::COMPUTE,
             BindingType::Buffer {
                 ty: BufferBindingType::Uniform,
                 has_dynamic_offset: false,
