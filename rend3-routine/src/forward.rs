@@ -383,7 +383,7 @@ fn build_forward_pipeline_inner<M: Material>(
             strip_index_format: None,
             front_face: args.renderer.handedness.into(),
             cull_mode: Some(match args.routine_type {
-                RoutineType::Depth => wgpu::Face::Back,
+                RoutineType::Depth => wgpu::Face::Front,
                 RoutineType::Forward => wgpu::Face::Back,
             }),
             unclipped_depth: false,
@@ -392,7 +392,7 @@ fn build_forward_pipeline_inner<M: Material>(
         },
         depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
-            depth_write_enabled: matches!(args.routine_type, RoutineType::Depth),
+            depth_write_enabled: true,
             depth_compare: CompareFunction::GreaterEqual,
             stencil: StencilState::default(),
             bias: match args.routine_type {
