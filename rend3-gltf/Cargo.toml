@@ -1,6 +1,6 @@
 [package]
 name = "rend3-gltf"
-version = "0.23.1"
+version = { workspace = true }
 authors = ["The rend3 Developers"]
 edition = "2021"
 description = "gltf scene and model loader for the rend3 rendering library."

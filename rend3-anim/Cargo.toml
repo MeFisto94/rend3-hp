@@ -1,6 +1,6 @@
 [package]
 name = "rend3-anim"
-version = "0.23.1"
+version = { workspace = true }
 authors = ["The rend3 Developers"]
 edition = "2021"
 description = "Skeletal animation playback utilities for rend3 rendering library."

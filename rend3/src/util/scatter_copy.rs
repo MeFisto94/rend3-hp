@@ -142,6 +142,7 @@ impl ScatterCopy {
 
 #[cfg(test)]
 mod test {
+    use wgpu::Backends;
     use wgpu::util::DeviceExt;
 
     use crate::util::scatter_copy::{ScatterCopy, ScatterData};
