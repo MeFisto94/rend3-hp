@@ -9,8 +9,8 @@ To download the default scene:
 ```bash
 # On windows, make sure to type curl.exe to get real curl, not the alias in powershell.
 # On *nix, just type `curl`.
-curl.exe https://cdn.cwfitz.com/scenes/rend3-default-scene.tar -o ./examples/scene-viewer/resources/rend3-default-scene.tar
-tar xf ./examples/scene-viewer/resources/rend3-default-scene.tar -C ./examples/scene-viewer/resources
+curl.exe https://cdn.cwfitz.com/scenes/rend3-default-scene.tar -o ./examples/src/scene_viewer/resources/rend3-default-scene.tar
+tar xf ./examples/src/scene_viewer/resources/rend3-default-scene.tar -C ./examples/src/scene_viewer/resources
 ```
 
 The source of the default scene is available here:

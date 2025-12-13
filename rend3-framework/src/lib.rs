@@ -336,6 +336,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_att
                         return;
                     }
                     Err(SurfaceError::OutOfMemory | SurfaceError::Lost) => panic!("Surface OOM"),
+                    Err(SurfaceError::Other) => panic!("Other surface error"),
                 };
 
                 let current_time = web_time::Instant::now();

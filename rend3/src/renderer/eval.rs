@@ -65,7 +65,6 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                     let profiler_query = data_core.profiler.try_lock().unwrap().begin_query(
                         "Add Skeleton",
                         &mut encoder,
-                        &renderer.device,
                     );
                     data_core.skeleton_manager.add(handle, *skeleton);
                     data_core.profiler.try_lock().unwrap().end_query(&mut encoder, profiler_query);

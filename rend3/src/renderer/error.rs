@@ -38,6 +38,9 @@ pub enum LimitType {
     MaxColorAttachments,
     MaxSubgroupSize,
     MinSubgroupSize,
+    MaxAccelerationStructureSize,
+    MeshShaderLimits,
+    MaxBindingArrayElements,
 }
 
 /// Reason why the renderer failed to initialize.

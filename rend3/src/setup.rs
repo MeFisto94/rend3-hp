@@ -1,50 +1,43 @@
 #![cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
 
-use std::sync::Arc;
-
-use wgpu::{
-    Adapter, AdapterInfo, Backend, Backends, BufferAddress, Device, DeviceDescriptor, DeviceType, Features,
-    Gles3MinorVersion, Instance, InstanceFlags, Limits, Queue,
-};
-
 #[allow(unused_imports)]
 use crate::format_sso;
 use crate::{
     managers::STARTING_2D_TEXTURES, util::typedefs::FastHashMap, LimitType, RendererInitializationError,
     RendererProfile,
 };
+use std::sync::Arc;
+use wgpu::{Adapter, AdapterInfo, Backend, BackendOptions, Backends, BufferAddress, Device, DeviceDescriptor, DeviceType, Dx12BackendOptions, ExperimentalFeatures, Features, GlBackendOptions, Gles3MinorVersion, Instance, InstanceFlags, Limits, MemoryBudgetThresholds, NoopBackendOptions, Queue, Trace};
 
 /// Largest uniform buffer binding needed to run rend3.
 pub const MAX_UNIFORM_BUFFER_BINDING_SIZE: BufferAddress = 1024;
 
 /// Features required to run in the GpuDriven profile.
 pub const GPU_DRIVEN_REQUIRED_FEATURES: Features = {
-    // We need to do this whole bits thing to make this const as OpOr isn't const
-    Features::from_bits_truncate(
-        Features::PUSH_CONSTANTS.bits()
-            | Features::TEXTURE_COMPRESSION_BC.bits()
-            | Features::DEPTH_CLIP_CONTROL.bits()
-            | Features::TEXTURE_BINDING_ARRAY.bits()
-            | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING.bits()
-            | Features::PARTIALLY_BOUND_BINDING_ARRAY.bits()
-            | Features::MULTI_DRAW_INDIRECT.bits()
-            | Features::MULTI_DRAW_INDIRECT_COUNT.bits()
-            | Features::SPIRV_SHADER_PASSTHROUGH.bits(),
-    )
+        Features::PUSH_CONSTANTS
+        .union(Features::TEXTURE_COMPRESSION_BC)
+        .union(Features::DEPTH_CLIP_CONTROL)
+        .union(Features::TEXTURE_BINDING_ARRAY)
+        .union(Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING)
+        .union(Features::PARTIALLY_BOUND_BINDING_ARRAY)
+        .union(Features::MULTI_DRAW_INDIRECT_COUNT)
+    // In the past, passthrough was requested as a feature, but isn't used inside rend3 itself, and
+    // the feature has been promoted to "EXPERIMENTAL" and as such isn't enabled in the device
+    // descriptor anyway.
+        // .union(Features::EXPERIMENTAL_PASSTHROUGH_SHADERS)
 };
 
 /// Features required to run in the GpuDriven profile.
-pub const CPU_DRIVEN_REQUIRED_FEATURES: Features = Features::from_bits_truncate(0);
+pub const CPU_DRIVEN_REQUIRED_FEATURES: Features = Features::empty();
 
 /// Features that rend3 can use if it they are available, but we don't require.
-pub const OPTIONAL_FEATURES: Features = Features::from_bits_truncate(
-    Features::DEPTH_CLIP_CONTROL.bits()
-        | Features::TEXTURE_COMPRESSION_BC.bits()
-        | Features::TEXTURE_COMPRESSION_ETC2.bits()
-        | Features::TEXTURE_COMPRESSION_ASTC.bits()
-        | Features::TIMESTAMP_QUERY.bits()
-        | Features::TIMESTAMP_QUERY_INSIDE_PASSES.bits(),
-);
+pub const OPTIONAL_FEATURES: Features =
+        Features::DEPTH_CLIP_CONTROL
+        .union(Features::TEXTURE_COMPRESSION_BC)
+        .union(Features::TEXTURE_COMPRESSION_ETC2)
+        .union(Features::TEXTURE_COMPRESSION_ASTC)
+        .union(Features::TIMESTAMP_QUERY)
+        .union(Features::TIMESTAMP_QUERY_INSIDE_PASSES);
 
 /// Check that all required features for a given profile are present in the feature
 /// set given.
@@ -100,6 +93,19 @@ pub const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_color_attachments: 8,
     min_subgroup_size: 0,
     max_subgroup_size: 0,
+    // We don't have the experimental ray query feature.
+    max_acceleration_structures_per_shader_stage: 0,
+    max_blas_geometry_count: 0,
+    max_blas_primitive_count: 0,
+    max_tlas_instance_count: 0,
+    // We don't support/require mesh shaders as of now
+    max_task_workgroup_total_count: 0,
+    max_task_workgroups_per_dimension: 0,
+    max_mesh_multiview_count: 0,
+    max_mesh_output_layers: 0,
+    // These may be wrong guesses
+    max_binding_array_elements_per_shader_stage: 1024,
+    max_binding_array_sampler_elements_per_shader_stage: 1024
 };
 
 /// Limits required to run in the CpuDriven profile.
@@ -138,8 +144,22 @@ pub const CPU_REQUIRED_LIMITS: Limits = Limits {
     max_color_attachments: 8,
     min_subgroup_size: 0,
     max_subgroup_size: 0,
+    // We don't have the experimental ray query feature.
+    max_acceleration_structures_per_shader_stage: 0,
+    max_blas_geometry_count: 0,
+    max_blas_primitive_count: 0,
+    max_tlas_instance_count: 0,
+    // We don't support/require mesh shaders as of now
+    max_task_workgroup_total_count: 0,
+    max_task_workgroups_per_dimension: 0,
+    max_mesh_multiview_count: 0,
+    max_mesh_output_layers: 0,
+    // We are not bindless.
+    max_binding_array_elements_per_shader_stage: 0,
+    max_binding_array_sampler_elements_per_shader_stage: 0
 };
 
+#[inline]
 fn check_limit_unlimited<LimitValue: Into<u64> + Ord>(
     d: LimitValue,
     r: LimitValue,
@@ -340,6 +360,56 @@ pub fn check_limits(profile: RendererProfile, device_limits: &Limits) -> Result<
             required_limits.min_subgroup_size,
             LimitType::MinSubgroupSize,
         )?,
+        max_acceleration_structures_per_shader_stage: check_limit_unlimited(
+            device_limits.max_acceleration_structures_per_shader_stage,
+            required_limits.max_acceleration_structures_per_shader_stage,
+            LimitType::MaxAccelerationStructureSize,
+        )?,
+        max_blas_geometry_count: check_limit_unlimited(
+            device_limits.max_blas_geometry_count,
+            required_limits.max_blas_geometry_count,
+            LimitType::MaxAccelerationStructureSize
+        )?,
+        max_blas_primitive_count: check_limit_unlimited(
+            device_limits.max_blas_primitive_count,
+            required_limits.max_blas_primitive_count,
+            LimitType::MaxAccelerationStructureSize
+        )?,
+        max_tlas_instance_count: check_limit_unlimited(
+            device_limits.max_tlas_instance_count,
+            required_limits.max_tlas_instance_count,
+            LimitType::MaxAccelerationStructureSize
+        )?,
+        max_mesh_output_layers: check_limit_unlimited(
+            device_limits.max_mesh_output_layers,
+            required_limits.max_mesh_output_layers,
+            LimitType::MeshShaderLimits
+        )?,
+        max_mesh_multiview_count: check_limit_unlimited(
+            device_limits.max_mesh_multiview_count,
+            required_limits.max_mesh_multiview_count,
+            LimitType::MeshShaderLimits
+        )?,
+        max_task_workgroups_per_dimension: check_limit_unlimited(
+            device_limits.max_task_workgroups_per_dimension,
+            required_limits.max_task_workgroups_per_dimension,
+            LimitType::MeshShaderLimits
+        )?,
+        max_task_workgroup_total_count: check_limit_unlimited(
+            device_limits.max_task_workgroup_total_count,
+            required_limits.max_task_workgroup_total_count,
+            LimitType::MeshShaderLimits
+        )?,
+        max_binding_array_sampler_elements_per_shader_stage: check_limit_unlimited(
+            device_limits.max_binding_array_sampler_elements_per_shader_stage,
+            required_limits.max_binding_array_sampler_elements_per_shader_stage,
+            LimitType::MaxBindingArrayElements,
+        )?,
+        max_binding_array_elements_per_shader_stage: check_limit_unlimited(
+            device_limits.max_binding_array_elements_per_shader_stage,
+            required_limits.max_binding_array_elements_per_shader_stage,
+            LimitType::MaxBindingArrayElements,
+        )?,
     })
 }
 
@@ -464,11 +534,23 @@ pub async fn create_iad(
     #[cfg(target_arch = "wasm32")]
     let default_backend_order = [Backend::BrowserWebGpu];
 
-    let instance = Instance::new(wgpu::InstanceDescriptor {
+    let instance = Instance::new(&wgpu::InstanceDescriptor {
         backends: backend_bits,
-        dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
-        gles_minor_version: Gles3MinorVersion::default(),
         flags: InstanceFlags::default(),
+        memory_budget_thresholds: MemoryBudgetThresholds::default(),
+        backend_options: BackendOptions {
+            noop: NoopBackendOptions {
+                enable: false
+            },
+            dx12: Dx12BackendOptions {
+                shader_compiler: wgpu::Dx12Compiler::Fxc,
+                ..Default::default()
+            },
+            gl: GlBackendOptions {
+                gles_minor_version: Gles3MinorVersion::default(),
+                ..Default::default()
+            }
+        }
     });
 
     let mut valid_adapters = FastHashMap::<Backend, Vec<PotentialAdapter<Adapter>>>::default();
@@ -548,8 +630,9 @@ pub async fn create_iad(
                         required_features: adapter.features.union(additional_features.unwrap_or_else(Features::empty)),
                         required_limits: adapter.limits,
                         memory_hints: Default::default(), // Use default for memory hints for now. Possible future optimization.
-                    },
-                    None,
+                        experimental_features: ExperimentalFeatures::disabled(), // Disabled for now
+                        trace: Trace::Off, // built in tracing is not working as of now apparently, plus we have profiling in rend3
+                    }
                 )
                 .await
                 .map_err(|_| RendererInitializationError::RequestDeviceFailed)?;

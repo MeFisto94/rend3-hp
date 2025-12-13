@@ -10,9 +10,7 @@ use rend3::{
     Renderer,
 };
 use rend3_routine::{base::BaseRenderGraph, pbr::PbrRoutine, tonemapping::TonemappingRoutine};
-use wgpu::{
-    Extent3d, ImageCopyBuffer, ImageDataLayout, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
-};
+use wgpu::{Extent3d, TexelCopyBufferInfo, TexelCopyBufferLayout, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
 
 use crate::{helpers::CaptureDropGuard, ThresholdSet};
 
@@ -198,9 +196,9 @@ pub async fn download_image(
         renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Test output encoder") });
     encoder.copy_texture_to_buffer(
         texture.as_image_copy(),
-        ImageCopyBuffer {
+        TexelCopyBufferInfo {
             buffer: &buffer,
-            layout: ImageDataLayout { offset: 0, bytes_per_row: Some(size.x * 4), rows_per_image: None },
+            layout: TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(size.x * 4), rows_per_image: None },
         },
         Extent3d { width: size.x, height: size.y, depth_or_array_layers: 1 },
     );
@@ -209,7 +207,7 @@ pub async fn download_image(
 
     let (sender, receiver) = flume::bounded(1);
     buffer.slice(..).map_async(wgpu::MapMode::Read, move |_| sender.send(()).unwrap());
-    renderer.device.poll(wgpu::Maintain::WaitForSubmissionIndex(submit_index));
+    renderer.device.poll(wgpu::PollType::Wait { submission_index: Some(submit_index), timeout: Default::default() })?;
 
     receiver.recv_async().await.context("Failed to recieve message from map_async")?;
 

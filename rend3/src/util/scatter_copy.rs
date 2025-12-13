@@ -142,7 +142,7 @@ impl ScatterCopy {
 
 #[cfg(test)]
 mod test {
-    use wgpu::Backends;
+    use wgpu::Trace;
     use wgpu::util::DeviceExt;
 
     use crate::util::scatter_copy::{ScatterCopy, ScatterData};
@@ -154,18 +154,19 @@ mod test {
 
     impl TestContext {
         fn new() -> Option<Self> {
-            let backends = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::all());
+            let backends = wgpu::Backends::from_env().unwrap_or(wgpu::Backends::all());
             let instance =
-                wgpu::Instance::new(wgpu::InstanceDescriptor { backends, ..wgpu::InstanceDescriptor::default() });
-            let adapter = pollster::block_on(wgpu::util::initialize_adapter_from_env_or_default(&instance, None))?;
+                wgpu::Instance::new(&wgpu::InstanceDescriptor { backends, ..wgpu::InstanceDescriptor::default() });
+            let adapter = pollster::block_on(wgpu::util::initialize_adapter_from_env_or_default(&instance, None)).ok()?;
             let (device, queue) = pollster::block_on(adapter.request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
                     required_features: wgpu::Features::empty(),
                     required_limits: wgpu::Limits::default(),
                     memory_hints: wgpu::MemoryHints::default(),
-                },
-                None,
+                    experimental_features: wgpu::ExperimentalFeatures::default(),
+                    trace: Trace::Off
+                }
             ))
             .ok()?;
 
@@ -176,7 +177,8 @@ mod test {
             self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("target buffer"),
                 contents: bytemuck::cast_slice(data),
-                usage: wgpu::BufferUsages::all() - wgpu::BufferUsages::MAP_READ - wgpu::BufferUsages::MAP_WRITE,
+                // TODO: Wouldn't it be better to be more explicit about the required buffer types?
+                usage: wgpu::BufferUsages::all() - wgpu::BufferUsages::MAP_READ - wgpu::BufferUsages::MAP_WRITE - wgpu::BufferUsages::BLAS_INPUT - wgpu::BufferUsages::TLAS_INPUT,
             })
         }
 
@@ -202,7 +204,7 @@ mod test {
             self.queue.submit(Some(encoder.finish()));
 
             staging.slice(..).map_async(wgpu::MapMode::Read, |_| ());
-            self.device.poll(wgpu::Maintain::Wait);
+            self.device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
 
             let res = bytemuck::cast_slice(&staging.slice(..).get_mapped_range()).to_vec();
 

@@ -5,6 +5,7 @@
 use std::{mem, sync::Arc};
 
 use egui::TexturesDelta;
+use egui_wgpu::RendererOptions;
 use glam::Vec4;
 use rend3::{
     graph::{NodeResourceUsage, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
@@ -33,7 +34,7 @@ impl EguiRenderRoutine {
         scale_factor: f32,
     ) -> Self {
         const DITHERING: bool = false;  // new EGUI feature.
-        let rpass = egui_wgpu::Renderer::new(&renderer.device, surface_format, None, samples as _, DITHERING);
+        let rpass = egui_wgpu::Renderer::new(&renderer.device, surface_format, RendererOptions { msaa_samples: samples as _, dithering: DITHERING, depth_stencil_format: None, predictable_texture_filtering: false });
 
         Self {
             internal: rpass,
@@ -142,14 +143,14 @@ impl EguiRenderRoutine {
         let texture_size = wgpu::Extent3d { width: dimensions.0, height: dimensions.1, depth_or_array_layers: 1 };
 
         queue.write_texture(
-            wgpu::ImageCopyTexture {
+            wgpu::TexelCopyTextureInfo {
                 texture: &image_texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
             image_rgba,
-            wgpu::ImageDataLayout {
+            wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some((dimensions.0 / block_dimensions.0) * block_size),
                 rows_per_image: None,

@@ -206,6 +206,7 @@ impl MipmapGenerator {
                     view: dst_view,
                     resolve_target: None,
                     ops: Operations { load: LoadOp::Clear(Color::BLACK), store: StoreOp::Store },
+                    depth_slice: None,
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
